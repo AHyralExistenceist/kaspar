@@ -43,20 +43,23 @@ class Notebook {
         }
     }
     setupReadOnlyMode() {
+        document.body.classList.add('read-only-mode');
         document.getElementById('prevBtn').addEventListener('click', () => this.prevPage());
         document.getElementById('nextBtn').addEventListener('click', () => this.nextPage());
         const leftContent = document.getElementById('leftContent');
         const rightContent = document.getElementById('rightContent');
-        leftContent.contentEditable = 'false';
-        rightContent.contentEditable = 'false';
-        const formatButtons = document.querySelector('.format-buttons');
-        const fontControls = document.querySelector('.font-controls');
-        const sizeControls = document.querySelector('.size-controls');
-        const shareBtn = document.getElementById('shareBtn');
-        if (formatButtons) formatButtons.style.display = 'none';
-        if (fontControls) fontControls.style.display = 'none';
-        if (sizeControls) sizeControls.style.display = 'none';
-        if (shareBtn) shareBtn.style.display = 'none';
+        if (leftContent) leftContent.contentEditable = 'false';
+        if (rightContent) rightContent.contentEditable = 'false';
+        setTimeout(() => {
+            const formatButtons = document.querySelector('.format-buttons');
+            const fontControls = document.querySelector('.font-controls');
+            const sizeControls = document.querySelector('.size-controls');
+            const shareBtn = document.getElementById('shareBtn');
+            if (formatButtons) formatButtons.style.display = 'none';
+            if (fontControls) fontControls.style.display = 'none';
+            if (sizeControls) sizeControls.style.display = 'none';
+            if (shareBtn) shareBtn.style.display = 'none';
+        }, 0);
     }
 
     setupEventListeners() {
@@ -122,6 +125,12 @@ class Notebook {
             this.isApplyingFont = true;
             if (!this.savedSelection) {
                 this.savedSelection = this.saveSelection();
+            }
+            if (!this.savedSelection) {
+                const currentSelection = this.saveSelection();
+                if (currentSelection) {
+                    this.savedSelection = currentSelection;
+                }
             }
             setTimeout(() => {
                 this.applyFontToSelection(selectedFont);
@@ -933,6 +942,7 @@ class Notebook {
     applyFontToSelection(fontFamily) {
         let range = null;
         let targetElement = null;
+        const selection = window.getSelection();
         if (this.savedSelection) {
             const restored = this.restoreSelection(this.savedSelection);
             if (restored) {
@@ -944,16 +954,21 @@ class Notebook {
                 else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
             }
         }
-        if (!range) {
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0 || selection.isCollapsed) return;
+        if (!range && selection.rangeCount > 0 && !selection.isCollapsed) {
             range = selection.getRangeAt(0).cloneRange();
             const leftContent = document.getElementById('leftContent');
             const rightContent = document.getElementById('rightContent');
             const commonAncestor = range.commonAncestorContainer;
             if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
             else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
-            else return;
+            else {
+                range = null;
+            }
+        }
+        if (!range || !targetElement) {
+            this.savedSelection = null;
+            this.isApplyingFont = false;
+            return;
         }
         try {
             this.applyInlineStyleToRange(range, { 'font-family': `"${fontFamily}"` });

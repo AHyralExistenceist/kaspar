@@ -358,6 +358,13 @@ body {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
 }
 
+.read-only-mode .format-buttons,
+.read-only-mode .font-controls,
+.read-only-mode .size-controls,
+.read-only-mode #shareBtn {
+    display: none !important;
+}
+
 @media (max-width: 768px) {
     .notebook {
         flex-direction: column;
