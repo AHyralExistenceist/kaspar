@@ -4,6 +4,7 @@ class Notebook {
         this.pages = {};
         this.currentFont = 'Noto Serif KR';
         this.currentSize = '16px';
+        this.isApplyingFont = false;
         this.init();
     }
 
@@ -90,8 +91,15 @@ class Notebook {
         fontSelect.addEventListener('change', (e) => {
             const selectedFont = e.target.value;
             this.currentFont = selectedFont;
+            this.isApplyingFont = true;
+            if (!this.savedSelection) {
+                this.savedSelection = this.saveSelection();
+            }
             setTimeout(() => {
                 this.applyFontToSelection(selectedFont);
+                setTimeout(() => {
+                    this.isApplyingFont = false;
+                }, 100);
             }, 0);
         });
         
@@ -128,6 +136,10 @@ class Notebook {
     }
     
     handleInput(e, targetElement) {
+        if (this.isApplyingFont) {
+            return;
+        }
+        
         setTimeout(() => {
             const selection = window.getSelection();
             if (selection.rangeCount === 0) {
@@ -843,10 +855,53 @@ class Notebook {
         this.saveAllPages();
     }
     
+    applyInlineStyleToRange(range, styleObj) {
+        const selectedText = range.toString();
+        if (!selectedText || !selectedText.trim()) return;
+        const doc = range.commonAncestorContainer.ownerDocument || document;
+        const walker = doc.createTreeWalker(
+            range.commonAncestorContainer,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: (node) => {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    try {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    } catch {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            }
+        );
+        const textNodes = [];
+        let n;
+        while ((n = walker.nextNode())) textNodes.push(n);
+        if (textNodes.length === 0) return;
+        for (const textNode of textNodes) {
+            let startOffset = 0;
+            let endOffset = textNode.nodeValue.length;
+            if (textNode === range.startContainer) startOffset = range.startOffset;
+            if (textNode === range.endContainer) endOffset = range.endOffset;
+            startOffset = Math.max(0, Math.min(startOffset, textNode.nodeValue.length));
+            endOffset = Math.max(0, Math.min(endOffset, textNode.nodeValue.length));
+            if (endOffset <= startOffset) continue;
+            let target = textNode;
+            if (startOffset > 0) target = target.splitText(startOffset);
+            if (endOffset - startOffset < target.nodeValue.length) target.splitText(endOffset - startOffset);
+            const parentEl = target.parentElement;
+            if (parentEl && parentEl.tagName === 'SPAN') {
+            }
+            const span = doc.createElement('span');
+            for (const [k, v] of Object.entries(styleObj)) {
+                span.style.setProperty(k, v, 'important');
+            }
+            parentEl.insertBefore(span, target);
+            span.appendChild(target);
+        }
+    }
     applyFontToSelection(fontFamily) {
         let range = null;
         let targetElement = null;
-        
         if (this.savedSelection) {
             const restored = this.restoreSelection(this.savedSelection);
             if (restored) {
@@ -854,121 +909,34 @@ class Notebook {
                 const leftContent = document.getElementById('leftContent');
                 const rightContent = document.getElementById('rightContent');
                 const commonAncestor = range.commonAncestorContainer;
-                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
-                    targetElement = leftContent;
-                } else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) {
-                    targetElement = rightContent;
-                }
+                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
+                else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
             }
         }
-        
         if (!range) {
             const selection = window.getSelection();
-            if (selection.rangeCount === 0) {
-                return;
-            }
-            
+            if (selection.rangeCount === 0 || selection.isCollapsed) return;
             range = selection.getRangeAt(0).cloneRange();
             const leftContent = document.getElementById('leftContent');
             const rightContent = document.getElementById('rightContent');
             const commonAncestor = range.commonAncestorContainer;
-            
-            if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
-                targetElement = leftContent;
-            } else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) {
-                targetElement = rightContent;
-            } else {
-                return;
-            }
+            if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
+            else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
+            else return;
         }
-        
-        if (!targetElement || !range) {
-            return;
-        }
-        
-        const selectedText = range.toString();
-        if (!selectedText || !selectedText.trim()) {
-            try {
-                const span = document.createElement('span');
-                span.style.cssText = `font-family: "${fontFamily}" !important;`;
-                span.innerHTML = '&#8203;';
-                range.insertNode(span);
-                range.setStartAfter(span);
-                range.collapse(true);
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(range);
-                targetElement.focus();
-                this.savedSelection = null;
-                this.saveAllPages();
-            } catch (e) {
-                console.error('Font application error:', e);
-                this.savedSelection = null;
-            }
-            return;
-        }
-        
         try {
-            const contents = range.extractContents();
-            
-            const removeFontStyles = (node) => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const element = node;
-                    element.style.removeProperty('font-family');
-                    
-                    if (element.children.length > 0) {
-                        Array.from(element.children).forEach(child => {
-                            removeFontStyles(child);
-                        });
-                    }
-                    
-                    if (element.style.length === 0 && element.tagName === 'SPAN' && !element.hasAttribute('style')) {
-                        const parent = element.parentNode;
-                        if (parent) {
-                            while (element.firstChild) {
-                                parent.insertBefore(element.firstChild, element);
-                            }
-                            parent.removeChild(element);
-                        }
-                    }
-                }
-            };
-            
-            if (contents.nodeType === Node.ELEMENT_NODE) {
-                removeFontStyles(contents);
-            } else if (contents.childNodes.length > 0) {
-                Array.from(contents.childNodes).forEach(child => {
-                    removeFontStyles(child);
-                });
-            }
-            
-            const span = document.createElement('span');
-            span.style.cssText = `font-family: "${fontFamily}" !important;`;
-            
-            if (contents.childNodes.length === 0) {
-                span.textContent = selectedText;
-            } else {
-                span.appendChild(contents);
-            }
-            
-            range.insertNode(span);
-            
+            this.applyInlineStyleToRange(range, { 'font-family': `"${fontFamily}"` });
             setTimeout(() => {
-                const newSelection = window.getSelection();
-                newSelection.removeAllRanges();
-                const newRange = document.createRange();
-                newRange.selectNodeContents(span);
-                newSelection.addRange(newRange);
-                targetElement.focus();
+                targetElement?.focus();
             }, 0);
-            
             this.savedSelection = null;
+            this.isApplyingFont = false;
+            this.saveAllPages();
         } catch (e) {
             console.error('Font application error:', e);
             this.savedSelection = null;
+            this.isApplyingFont = false;
         }
-        
-        this.saveAllPages();
     }
     
     async exportToExample() {
