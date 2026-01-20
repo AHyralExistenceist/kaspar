@@ -13,10 +13,20 @@ class Notebook {
         this.renderPage();
         setInterval(() => {
             this.saveAllPages();
-        }, 3000);
+        }, 2000);
         
         window.addEventListener('beforeunload', () => {
             this.saveAllPages();
+        });
+        
+        window.addEventListener('pagehide', () => {
+            this.saveAllPages();
+        });
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.saveAllPages();
+            }
         });
     }
 
@@ -339,8 +349,10 @@ class Notebook {
             date: new Date().toISOString()
         };
         
+        const pagesToSave = JSON.stringify(this.pages);
+        
         try {
-            localStorage.setItem('notebook-pages', JSON.stringify(this.pages));
+            localStorage.setItem('notebook-pages', pagesToSave);
         } catch (error) {
             console.error('Error saving all pages to localStorage:', error);
         }
@@ -352,7 +364,7 @@ class Notebook {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(this.pages)
+                    body: pagesToSave
                 });
                 
                 if (!response.ok) {
@@ -414,7 +426,11 @@ class Notebook {
     }
 
     renderPage() {
-        const pageData = this.pages[this.currentPage] || { left: '', right: '' };
+        if (!this.pages[this.currentPage]) {
+            this.pages[this.currentPage] = { left: '', right: '', date: new Date().toISOString() };
+        }
+        
+        const pageData = this.pages[this.currentPage];
         
         const leftContentEl = document.getElementById('leftContent');
         const rightContentEl = document.getElementById('rightContent');
@@ -456,6 +472,15 @@ class Notebook {
 
     prevPage() {
         if (this.currentPage > 1) {
+            const leftContentEl = document.getElementById('leftContent');
+            const rightContentEl = document.getElementById('rightContent');
+            if (leftContentEl && rightContentEl) {
+                this.pages[this.currentPage] = {
+                    left: leftContentEl.innerHTML,
+                    right: rightContentEl.innerHTML,
+                    date: new Date().toISOString()
+                };
+            }
             this.saveAllPages();
             this.currentPage--;
             this.renderPage();
@@ -465,6 +490,15 @@ class Notebook {
     nextPage() {
         const nextRightPageNum = (this.currentPage + 1) * 2 + 2;
         if (nextRightPageNum <= 50) {
+            const leftContentEl = document.getElementById('leftContent');
+            const rightContentEl = document.getElementById('rightContent');
+            if (leftContentEl && rightContentEl) {
+                this.pages[this.currentPage] = {
+                    left: leftContentEl.innerHTML,
+                    right: rightContentEl.innerHTML,
+                    date: new Date().toISOString()
+                };
+            }
             this.saveAllPages();
             this.currentPage++;
             this.renderPage();
