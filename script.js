@@ -124,9 +124,6 @@ class Notebook {
             this.currentFont = selectedFont;
             this.isApplyingFont = true;
             if (!this.savedSelection) {
-                this.savedSelection = this.saveSelection();
-            }
-            if (!this.savedSelection) {
                 const currentSelection = this.saveSelection();
                 if (currentSelection) {
                     this.savedSelection = currentSelection;
@@ -974,18 +971,26 @@ class Notebook {
                 else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
             }
         }
-        if (!range && selection.rangeCount > 0 && !selection.isCollapsed) {
-            range = selection.getRangeAt(0).cloneRange();
-            const leftContent = document.getElementById('leftContent');
-            const rightContent = document.getElementById('rightContent');
-            const commonAncestor = range.commonAncestorContainer;
-            if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
-            else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
-            else {
-                range = null;
+        if (!range) {
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                range = selection.getRangeAt(0).cloneRange();
+                const leftContent = document.getElementById('leftContent');
+                const rightContent = document.getElementById('rightContent');
+                const commonAncestor = range.commonAncestorContainer;
+                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
+                else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
+                else {
+                    range = null;
+                }
             }
         }
         if (!range || !targetElement) {
+            this.savedSelection = null;
+            this.isApplyingFont = false;
+            return;
+        }
+        const selectedText = range.toString();
+        if (!selectedText || !selectedText.trim()) {
             this.savedSelection = null;
             this.isApplyingFont = false;
             return;
