@@ -298,10 +298,14 @@ class Notebook {
             });
             
             if (!response.ok) {
-                console.error('Failed to save pages');
+                throw new Error('Server save failed');
             }
         } catch (error) {
-            console.error('Error saving pages:', error);
+            try {
+                localStorage.setItem('notebook-pages', JSON.stringify(this.pages));
+            } catch (localError) {
+                console.error('Error saving pages:', localError);
+            }
         }
     }
 
@@ -310,12 +314,36 @@ class Notebook {
             const response = await fetch('/api/pages');
             if (response.ok) {
                 const saved = await response.json();
-                if (saved && typeof saved === 'object') {
+                if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
                     this.pages = saved;
+                    return;
                 }
             }
         } catch (error) {
-            console.error('Error loading pages:', error);
+        }
+        
+        try {
+            const saved = localStorage.getItem('notebook-pages');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                    this.pages = parsed;
+                    return;
+                }
+            }
+        } catch (error) {
+        }
+        
+        try {
+            const response = await fetch('/example-data.json');
+            if (response.ok) {
+                const example = await response.json();
+                if (example && typeof example === 'object' && Object.keys(example).length > 0) {
+                    this.pages = example;
+                    localStorage.setItem('notebook-pages', JSON.stringify(example));
+                }
+            }
+        } catch (error) {
         }
     }
 
