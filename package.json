@@ -1,0 +1,13 @@
+{
+  "name": "notebook-app",
+  "version": "1.0.0",
+  "description": "Simple notebook web application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
+

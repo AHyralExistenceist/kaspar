@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>카스파의 노트</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&family=Noto+Sans+KR:wght@400;500&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=Gaegu:wght@400&family=Nanum+Gothic:wght@400;700&family=Nanum+Brush+Script&family=Jua&family=Do+Hyeon&family=Black+Han+Sans&family=Gamja+Flower&family=Sunflower:wght@300;500;700&family=Yeon+Sung&family=Single+Day&family=Hi+Melody&family=Poor+Story&display=swap" rel="stylesheet">
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,7 +21,7 @@
                         <span class="value" id="pageNumber">1</span>
                     </div>
                 </div>
-                <div class="page-content" contenteditable="true" id="leftContent"></div>
+                <div class="page-content" contenteditable="true" spellcheck="false" id="leftContent"></div>
             </div>
             <div class="spine"></div>
             <div class="page right-page" id="rightPage">
@@ -26,13 +31,52 @@
                         <span class="value" id="pageNumberRight">2</span>
                     </div>
                 </div>
-                <div class="page-content" contenteditable="true" id="rightContent"></div>
+                <div class="page-content" contenteditable="true" spellcheck="false" id="rightContent"></div>
             </div>
         </div>
         <div class="controls">
             <button class="nav-btn" id="prevBtn">이전</button>
             <span class="page-info" id="pageInfo">페이지 1</span>
             <button class="nav-btn" id="nextBtn">다음</button>
+            <div class="format-buttons">
+                <button class="format-btn" id="boldBtn" title="볼드">B</button>
+                <button class="format-btn" id="italicBtn" title="이탤릭">I</button>
+                <button class="format-btn" id="strikeBtn" title="취소선">S</button>
+            </div>
+            <div class="font-controls">
+                <label for="fontSelect">폰트:</label>
+                <select id="fontSelect" class="font-select">
+                    <option value="Noto Serif KR">Noto Serif KR</option>
+                    <option value="Noto Sans KR">Noto Sans KR</option>
+                    <option value="Nanum Myeongjo">Nanum Myeongjo</option>
+                    <option value="Nanum Gothic">Nanum Gothic</option>
+                    <option value="Nanum Pen Script">Nanum Pen Script</option>
+                    <option value="Nanum Brush Script">Nanum Brush Script</option>
+                    <option value="Gaegu">Gaegu</option>
+                    <option value="Jua">Jua</option>
+                    <option value="Do Hyeon">Do Hyeon</option>
+                    <option value="Black Han Sans">Black Han Sans</option>
+                    <option value="Gamja Flower">Gamja Flower</option>
+                    <option value="Sunflower">Sunflower</option>
+                    <option value="Yeon Sung">Yeon Sung</option>
+                    <option value="Single Day">Single Day</option>
+                    <option value="Hi Melody">Hi Melody</option>
+                    <option value="Poor Story">Poor Story</option>
+                </select>
+            </div>
+            <div class="size-controls">
+                <label for="sizeSelect">크기:</label>
+                <select id="sizeSelect" class="size-select">
+                    <option value="12px">12px</option>
+                    <option value="14px">14px</option>
+                    <option value="16px" selected>16px</option>
+                    <option value="18px">18px</option>
+                    <option value="20px">20px</option>
+                    <option value="24px">24px</option>
+                    <option value="28px">28px</option>
+                    <option value="32px">32px</option>
+                </select>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>
