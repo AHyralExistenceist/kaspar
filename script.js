@@ -558,95 +558,62 @@ class Notebook {
     }
     
     hasStyleInRange(range, styleProperty, styleValue) {
-        const walker = document.createTreeWalker(
+        const selectedText = range.toString();
+        if (!selectedText || !selectedText.trim()) return false;
+        const doc = range.commonAncestorContainer.ownerDocument || document;
+        const textWalker = doc.createTreeWalker(
             range.commonAncestorContainer,
-            NodeFilter.SHOW_ELEMENT,
-            null,
-            false
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: (node) => {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    try {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    } catch {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            }
         );
-        
-        let node;
-        let hasStyle = false;
-        let checkedCount = 0;
-        
-        while (node = walker.nextNode()) {
-            if (range.intersectsNode(node)) {
-                checkedCount++;
-                const computedStyle = window.getComputedStyle(node);
-                let nodeValue = '';
-                
-                if (styleProperty === 'font-weight') {
-                    nodeValue = computedStyle.fontWeight;
-                    if (nodeValue === 'bold' || parseInt(nodeValue) >= 700) {
-                        hasStyle = true;
-                    }
-                } else if (styleProperty === 'font-style') {
-                    nodeValue = computedStyle.fontStyle;
-                    if (nodeValue === 'italic') {
-                        hasStyle = true;
-                    }
-                } else if (styleProperty === 'text-decoration') {
-                    nodeValue = computedStyle.textDecoration;
-                    if (nodeValue.includes('line-through')) {
-                        hasStyle = true;
+        const textNodes = [];
+        let n;
+        while ((n = textWalker.nextNode())) textNodes.push(n);
+        if (textNodes.length === 0) return false;
+        let allHaveStyle = true;
+        let hasAnyStyle = false;
+        for (const textNode of textNodes) {
+            let startOffset = 0;
+            let endOffset = textNode.nodeValue.length;
+            if (textNode === range.startContainer) startOffset = range.startOffset;
+            if (textNode === range.endContainer) endOffset = range.endOffset;
+            startOffset = Math.max(0, Math.min(startOffset, textNode.nodeValue.length));
+            endOffset = Math.max(0, Math.min(endOffset, textNode.nodeValue.length));
+            if (endOffset <= startOffset) continue;
+            let currentParent = textNode.parentElement;
+            let foundStyle = false;
+            while (currentParent && currentParent !== doc.body) {
+                if (currentParent.tagName === 'SPAN' || currentParent.tagName === 'B' || currentParent.tagName === 'I' || currentParent.tagName === 'S' || currentParent.tagName === 'STRIKE') {
+                    const computedStyle = window.getComputedStyle(currentParent);
+                    const inlineStyle = currentParent.style.getPropertyValue(styleProperty);
+                    const hasStyle = styleProperty === 'font-weight' ? 
+                        (inlineStyle === 'bold' || computedStyle.fontWeight === 'bold' || parseInt(computedStyle.fontWeight) >= 700) :
+                        styleProperty === 'font-style' ? 
+                        (inlineStyle === 'italic' || computedStyle.fontStyle === 'italic') :
+                        styleProperty === 'text-decoration' ? 
+                        (inlineStyle.includes('line-through') || computedStyle.textDecoration.includes('line-through')) : false;
+                    if (hasStyle) {
+                        foundStyle = true;
+                        hasAnyStyle = true;
+                        break;
                     }
                 }
-                
-                const inlineStyle = node.style.getPropertyValue(styleProperty);
-                if (inlineStyle && inlineStyle.includes(styleValue)) {
-                    hasStyle = true;
-                }
+                currentParent = currentParent.parentElement;
+            }
+            if (!foundStyle) {
+                allHaveStyle = false;
             }
         }
-        
-        if (checkedCount === 0) {
-            const textNodes = [];
-            const textWalker = document.createTreeWalker(
-                range.commonAncestorContainer,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-            
-            let textNode;
-            while (textNode = textWalker.nextNode()) {
-                if (range.intersectsNode(textNode)) {
-                    const parent = textNode.parentElement;
-                    if (parent) {
-                        const computedStyle = window.getComputedStyle(parent);
-                        let nodeValue = '';
-                        
-                        if (styleProperty === 'font-weight') {
-                            nodeValue = computedStyle.fontWeight;
-                            if (nodeValue === 'bold' || parseInt(nodeValue) >= 700) {
-                                hasStyle = true;
-                                break;
-                            }
-                        } else if (styleProperty === 'font-style') {
-                            nodeValue = computedStyle.fontStyle;
-                            if (nodeValue === 'italic') {
-                                hasStyle = true;
-                                break;
-                            }
-                        } else if (styleProperty === 'text-decoration') {
-                            nodeValue = computedStyle.textDecoration;
-                            if (nodeValue.includes('line-through')) {
-                                hasStyle = true;
-                                break;
-                            }
-                        }
-                        
-                        const inlineStyle = parent.style.getPropertyValue(styleProperty);
-                        if (inlineStyle && inlineStyle.includes(styleValue)) {
-                            hasStyle = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        
-        return hasStyle;
+        return allHaveStyle && hasAnyStyle;
     }
     
     removeStyleFromRange(range, styleProperty) {
@@ -742,39 +709,6 @@ class Notebook {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return;
         const doc = range.commonAncestorContainer.ownerDocument || document;
-        const walker = doc.createTreeWalker(
-            range.commonAncestorContainer,
-            NodeFilter.SHOW_ELEMENT,
-            {
-                acceptNode: (node) => {
-                    if (node.nodeType !== Node.ELEMENT_NODE) return NodeFilter.FILTER_REJECT;
-                    try {
-                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-                    } catch {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                }
-            }
-        );
-        const elementsToProcess = [];
-        let n;
-        while ((n = walker.nextNode())) {
-            if (n.style.getPropertyValue(styleProperty)) {
-                elementsToProcess.push(n);
-            }
-        }
-        for (const element of elementsToProcess) {
-            element.style.removeProperty(styleProperty);
-            if (element.style.length === 0 && element.tagName === 'SPAN') {
-                const parent = element.parentNode;
-                if (parent) {
-                    while (element.firstChild) {
-                        parent.insertBefore(element.firstChild, element);
-                    }
-                    parent.removeChild(element);
-                }
-            }
-        }
         const textWalker = doc.createTreeWalker(
             range.commonAncestorContainer,
             NodeFilter.SHOW_TEXT,
@@ -790,26 +724,46 @@ class Notebook {
             }
         );
         const textNodes = [];
+        let n;
         while ((n = textWalker.nextNode())) textNodes.push(n);
+        if (textNodes.length === 0) return;
         for (const textNode of textNodes) {
-            const parent = textNode.parentElement;
-            if (parent && parent.tagName === 'SPAN') {
-                const computedStyle = window.getComputedStyle(parent);
-                const hasStyle = styleProperty === 'font-weight' ? (computedStyle.fontWeight === 'bold' || parseInt(computedStyle.fontWeight) >= 700) :
-                                 styleProperty === 'font-style' ? (computedStyle.fontStyle === 'italic') :
-                                 styleProperty === 'text-decoration' ? (computedStyle.textDecoration.includes('line-through')) : false;
-                if (hasStyle) {
-                    parent.style.removeProperty(styleProperty);
-                    if (parent.style.length === 0) {
-                        const grandParent = parent.parentNode;
-                        if (grandParent) {
-                            while (parent.firstChild) {
-                                grandParent.insertBefore(parent.firstChild, parent);
+            let startOffset = 0;
+            let endOffset = textNode.nodeValue.length;
+            if (textNode === range.startContainer) startOffset = range.startOffset;
+            if (textNode === range.endContainer) endOffset = range.endOffset;
+            startOffset = Math.max(0, Math.min(startOffset, textNode.nodeValue.length));
+            endOffset = Math.max(0, Math.min(endOffset, textNode.nodeValue.length));
+            if (endOffset <= startOffset) continue;
+            let target = textNode;
+            if (startOffset > 0) target = target.splitText(startOffset);
+            if (endOffset - startOffset < target.nodeValue.length) target.splitText(endOffset - startOffset);
+            let currentParent = target.parentElement;
+            while (currentParent && currentParent !== doc.body) {
+                if (currentParent.tagName === 'SPAN') {
+                    const computedStyle = window.getComputedStyle(currentParent);
+                    const inlineStyle = currentParent.style.getPropertyValue(styleProperty);
+                    const hasStyle = styleProperty === 'font-weight' ? 
+                        (inlineStyle === 'bold' || computedStyle.fontWeight === 'bold' || parseInt(computedStyle.fontWeight) >= 700) :
+                        styleProperty === 'font-style' ? 
+                        (inlineStyle === 'italic' || computedStyle.fontStyle === 'italic') :
+                        styleProperty === 'text-decoration' ? 
+                        (inlineStyle.includes('line-through') || computedStyle.textDecoration.includes('line-through')) : false;
+                    if (hasStyle) {
+                        const parent = currentParent.parentNode;
+                        if (parent) {
+                            currentParent.style.removeProperty(styleProperty);
+                            if (currentParent.style.length === 0) {
+                                while (currentParent.firstChild) {
+                                    parent.insertBefore(currentParent.firstChild, currentParent);
+                                }
+                                parent.removeChild(currentParent);
                             }
-                            grandParent.removeChild(parent);
                         }
+                        break;
                     }
                 }
+                currentParent = currentParent.parentElement;
             }
         }
     }
