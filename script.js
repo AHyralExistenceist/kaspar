@@ -5,30 +5,58 @@ class Notebook {
         this.currentFont = 'Noto Serif KR';
         this.currentSize = '16px';
         this.isApplyingFont = false;
+        this.isReadOnly = this.checkReadOnlyMode();
         this.init();
+    }
+    checkReadOnlyMode() {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || protocol === 'file:') {
+            return false;
+        }
+        return true;
     }
 
     async init() {
         await this.loadPages();
-        this.setupEventListeners();
+        if (this.isReadOnly) {
+            this.setupReadOnlyMode();
+        } else {
+            this.setupEventListeners();
+        }
         this.renderPage();
-        setInterval(() => {
-            this.saveAllPages();
-        }, 2000);
-        
-        window.addEventListener('beforeunload', () => {
-            this.saveAllPages();
-        });
-        
-        window.addEventListener('pagehide', () => {
-            this.saveAllPages();
-        });
-        
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
+        if (!this.isReadOnly) {
+            setInterval(() => {
                 this.saveAllPages();
-            }
-        });
+            }, 2000);
+            window.addEventListener('beforeunload', () => {
+                this.saveAllPages();
+            });
+            window.addEventListener('pagehide', () => {
+                this.saveAllPages();
+            });
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.saveAllPages();
+                }
+            });
+        }
+    }
+    setupReadOnlyMode() {
+        document.getElementById('prevBtn').addEventListener('click', () => this.prevPage());
+        document.getElementById('nextBtn').addEventListener('click', () => this.nextPage());
+        const leftContent = document.getElementById('leftContent');
+        const rightContent = document.getElementById('rightContent');
+        leftContent.contentEditable = 'false';
+        rightContent.contentEditable = 'false';
+        const formatButtons = document.querySelector('.format-buttons');
+        const fontControls = document.querySelector('.font-controls');
+        const sizeControls = document.querySelector('.size-controls');
+        const shareBtn = document.getElementById('shareBtn');
+        if (formatButtons) formatButtons.style.display = 'none';
+        if (fontControls) fontControls.style.display = 'none';
+        if (sizeControls) sizeControls.style.display = 'none';
+        if (shareBtn) shareBtn.style.display = 'none';
     }
 
     setupEventListeners() {
@@ -471,7 +499,10 @@ class Notebook {
             document.getElementById('rightContent').contentEditable = 'false';
         } else {
             rightPage.classList.remove('empty');
-            document.getElementById('rightContent').contentEditable = 'true';
+            document.getElementById('rightContent').contentEditable = this.isReadOnly ? 'false' : 'true';
+        }
+        if (this.isReadOnly) {
+            document.getElementById('leftContent').contentEditable = 'false';
         }
         
         document.getElementById('pageNumber').textContent = leftPageNum;
