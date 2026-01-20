@@ -64,7 +64,7 @@ class Notebook {
         document.getElementById('rightContent').innerHTML = pageData.right || '';
         
         const leftPageNum = (this.currentPage - 1) * 2 + 1;
-        const rightPageNum = (this.currentPage - 1) * 2 + 2;
+        const rightPageNum = (this.currentPage - 1) * 2 + 3;
         
         document.getElementById('pageNumber').textContent = leftPageNum;
         document.getElementById('pageNumberRight').textContent = rightPageNum;
@@ -84,6 +84,7 @@ class Notebook {
         }
         
         document.getElementById('prevBtn').disabled = this.currentPage === 1;
+        document.getElementById('nextBtn').disabled = rightPageNum >= 50;
     }
 
     prevPage() {
@@ -95,9 +96,12 @@ class Notebook {
     }
 
     nextPage() {
-        this.saveCurrentPage();
-        this.currentPage++;
-        this.renderPage();
+        const nextRightPageNum = this.currentPage * 2 + 3;
+        if (nextRightPageNum <= 50) {
+            this.saveCurrentPage();
+            this.currentPage++;
+            this.renderPage();
+        }
     }
 }
 
