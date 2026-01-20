@@ -400,35 +400,35 @@ class Notebook {
         } catch (error) {
         }
         
-        try {
-            const saved = localStorage.getItem('notebook-pages');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-                    this.pages = parsed;
-                }
-            }
-        } catch (error) {
-        }
-        
         const paths = ['./example-data.json', 'example-data.json', '/example-data.json'];
+        let exampleLoaded = false;
         for (const path of paths) {
             try {
                 const response = await fetch(path);
                 if (response.ok) {
                     const example = await response.json();
                     if (example && typeof example === 'object' && Object.keys(example).length > 0) {
-                        if (!this.pages || Object.keys(this.pages).length === 0) {
-                            this.pages = example;
-                        }
-                        if (!localStorage.getItem('notebook-pages')) {
-                            localStorage.setItem('notebook-pages', JSON.stringify(example));
-                        }
+                        this.pages = example;
+                        localStorage.setItem('notebook-pages', JSON.stringify(example));
+                        exampleLoaded = true;
                         return;
                     }
                 }
             } catch (error) {
                 continue;
+            }
+        }
+        
+        if (!exampleLoaded) {
+            try {
+                const saved = localStorage.getItem('notebook-pages');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                        this.pages = parsed;
+                    }
+                }
+            } catch (error) {
             }
         }
         
