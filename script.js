@@ -12,8 +12,12 @@ class Notebook {
         this.setupEventListeners();
         this.renderPage();
         setInterval(() => {
-            this.saveCurrentPage();
-        }, 5000);
+            this.saveAllPages();
+        }, 3000);
+        
+        window.addEventListener('beforeunload', () => {
+            this.saveAllPages();
+        });
     }
 
     setupEventListeners() {
@@ -25,15 +29,15 @@ class Notebook {
         
         leftContent.addEventListener('input', (e) => {
             this.handleInput(e, leftContent);
-            this.saveCurrentPage();
+            this.saveAllPages();
         });
         rightContent.addEventListener('input', (e) => {
             this.handleInput(e, rightContent);
-            this.saveCurrentPage();
+            this.saveAllPages();
         });
         
-        leftContent.addEventListener('blur', () => this.saveCurrentPage());
-        rightContent.addEventListener('blur', () => this.saveCurrentPage());
+        leftContent.addEventListener('blur', () => this.saveAllPages());
+        rightContent.addEventListener('blur', () => this.saveAllPages());
         
         leftContent.addEventListener('paste', (e) => this.handlePaste(e));
         rightContent.addEventListener('paste', (e) => this.handlePaste(e));
@@ -232,7 +236,7 @@ class Notebook {
         selection.removeAllRanges();
         selection.addRange(range);
         
-        this.saveCurrentPage();
+        this.saveAllPages();
     }
 
     saveSelection() {
@@ -281,8 +285,15 @@ class Notebook {
     }
     
     async saveCurrentPage() {
-        const leftContent = document.getElementById('leftContent').innerHTML;
-        const rightContent = document.getElementById('rightContent').innerHTML;
+        const leftContentEl = document.getElementById('leftContent');
+        const rightContentEl = document.getElementById('rightContent');
+        
+        if (!leftContentEl || !rightContentEl) {
+            return;
+        }
+        
+        const leftContent = leftContentEl.innerHTML;
+        const rightContent = rightContentEl.innerHTML;
         
         this.pages[this.currentPage] = {
             left: leftContent,
@@ -309,6 +320,47 @@ class Notebook {
                 console.error('Error saving pages:', localError);
             }
         }
+    }
+    
+    saveAllPages() {
+        const leftContentEl = document.getElementById('leftContent');
+        const rightContentEl = document.getElementById('rightContent');
+        
+        if (!leftContentEl || !rightContentEl) {
+            return;
+        }
+        
+        const leftContent = leftContentEl.innerHTML;
+        const rightContent = rightContentEl.innerHTML;
+        
+        this.pages[this.currentPage] = {
+            left: leftContent,
+            right: rightContent,
+            date: new Date().toISOString()
+        };
+        
+        try {
+            localStorage.setItem('notebook-pages', JSON.stringify(this.pages));
+        } catch (error) {
+            console.error('Error saving all pages to localStorage:', error);
+        }
+        
+        (async () => {
+            try {
+                const response = await fetch('/api/pages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.pages)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Server save failed');
+                }
+            } catch (error) {
+            }
+        })();
     }
 
     async loadPages() {
@@ -404,7 +456,7 @@ class Notebook {
 
     prevPage() {
         if (this.currentPage > 1) {
-            this.saveCurrentPage();
+            this.saveAllPages();
             this.currentPage--;
             this.renderPage();
         }
@@ -413,7 +465,7 @@ class Notebook {
     nextPage() {
         const nextRightPageNum = (this.currentPage + 1) * 2 + 2;
         if (nextRightPageNum <= 50) {
-            this.saveCurrentPage();
+            this.saveAllPages();
             this.currentPage++;
             this.renderPage();
         }
@@ -626,7 +678,7 @@ class Notebook {
             console.error('Style application error:', e);
         }
         
-        this.saveCurrentPage();
+        this.saveAllPages();
     }
     
     applySizeToSelection(fontSize) {
@@ -686,7 +738,7 @@ class Notebook {
                 selection.addRange(range);
                 targetElement.focus();
                 this.savedSelection = null;
-                this.saveCurrentPage();
+                this.saveAllPages();
             } catch (e) {
                 console.error('Size application error:', e);
                 this.savedSelection = null;
@@ -754,7 +806,7 @@ class Notebook {
             this.savedSelection = null;
         }
         
-        this.saveCurrentPage();
+        this.saveAllPages();
     }
     
     applyFontToSelection(fontFamily) {
@@ -814,7 +866,7 @@ class Notebook {
                 selection.addRange(range);
                 targetElement.focus();
                 this.savedSelection = null;
-                this.saveCurrentPage();
+                this.saveAllPages();
             } catch (e) {
                 console.error('Font application error:', e);
                 this.savedSelection = null;
@@ -882,7 +934,7 @@ class Notebook {
             this.savedSelection = null;
         }
         
-        this.saveCurrentPage();
+        this.saveAllPages();
     }
     
     async exportToExample() {
