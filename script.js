@@ -692,21 +692,16 @@ class Notebook {
     
     applyStyleToSelection(styleType) {
         const selection = window.getSelection();
-        
         if (selection.rangeCount === 0 || selection.isCollapsed) {
             return;
         }
-        
         const range = selection.getRangeAt(0).cloneRange();
         const selectedText = range.toString();
-        
         if (!selectedText || !selectedText.trim()) {
             return;
         }
-        
         const leftContent = document.getElementById('leftContent');
         const rightContent = document.getElementById('rightContent');
-        
         let targetElement = null;
         const commonAncestor = range.commonAncestorContainer;
         if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
@@ -716,10 +711,8 @@ class Notebook {
         } else {
             return;
         }
-        
         let styleProperty = '';
         let styleValue = '';
-        
         if (styleType === 'bold') {
             styleProperty = 'font-weight';
             styleValue = 'bold';
@@ -730,41 +723,95 @@ class Notebook {
             styleProperty = 'text-decoration';
             styleValue = 'line-through';
         }
-        
         const hasStyle = this.hasStyleInRange(range, styleProperty, styleValue);
-        
         try {
             if (hasStyle) {
-                const contents = this.removeStyleFromRange(range, styleProperty);
-                range.insertNode(contents);
+                this.removeStyleFromRangeInline(range, styleProperty);
             } else {
-                const contents = range.extractContents();
-                const span = document.createElement('span');
-                span.style.setProperty(styleProperty, styleValue, 'important');
-                
-                if (contents.childNodes.length === 0) {
-                    span.textContent = selectedText;
-                } else {
-                    span.appendChild(contents);
-                }
-                
-                range.insertNode(span);
+                this.applyInlineStyleToRange(range, { [styleProperty]: styleValue });
             }
-            
             setTimeout(() => {
-                const newSelection = window.getSelection();
-                newSelection.removeAllRanges();
-                const newRange = document.createRange();
-                newRange.setStart(range.startContainer, range.startOffset);
-                newRange.setEnd(range.endContainer, range.endOffset);
-                newSelection.addRange(newRange);
-                targetElement.focus();
+                targetElement?.focus();
             }, 0);
         } catch (e) {
             console.error('Style application error:', e);
         }
-        
         this.saveAllPages();
+    }
+    removeStyleFromRangeInline(range, styleProperty) {
+        const selectedText = range.toString();
+        if (!selectedText || !selectedText.trim()) return;
+        const doc = range.commonAncestorContainer.ownerDocument || document;
+        const walker = doc.createTreeWalker(
+            range.commonAncestorContainer,
+            NodeFilter.SHOW_ELEMENT,
+            {
+                acceptNode: (node) => {
+                    if (node.nodeType !== Node.ELEMENT_NODE) return NodeFilter.FILTER_REJECT;
+                    try {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    } catch {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            }
+        );
+        const elementsToProcess = [];
+        let n;
+        while ((n = walker.nextNode())) {
+            if (n.style.getPropertyValue(styleProperty)) {
+                elementsToProcess.push(n);
+            }
+        }
+        for (const element of elementsToProcess) {
+            element.style.removeProperty(styleProperty);
+            if (element.style.length === 0 && element.tagName === 'SPAN') {
+                const parent = element.parentNode;
+                if (parent) {
+                    while (element.firstChild) {
+                        parent.insertBefore(element.firstChild, element);
+                    }
+                    parent.removeChild(element);
+                }
+            }
+        }
+        const textWalker = doc.createTreeWalker(
+            range.commonAncestorContainer,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: (node) => {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    try {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    } catch {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                }
+            }
+        );
+        const textNodes = [];
+        while ((n = textWalker.nextNode())) textNodes.push(n);
+        for (const textNode of textNodes) {
+            const parent = textNode.parentElement;
+            if (parent && parent.tagName === 'SPAN') {
+                const computedStyle = window.getComputedStyle(parent);
+                const hasStyle = styleProperty === 'font-weight' ? (computedStyle.fontWeight === 'bold' || parseInt(computedStyle.fontWeight) >= 700) :
+                                 styleProperty === 'font-style' ? (computedStyle.fontStyle === 'italic') :
+                                 styleProperty === 'text-decoration' ? (computedStyle.textDecoration.includes('line-through')) : false;
+                if (hasStyle) {
+                    parent.style.removeProperty(styleProperty);
+                    if (parent.style.length === 0) {
+                        const grandParent = parent.parentNode;
+                        if (grandParent) {
+                            while (parent.firstChild) {
+                                grandParent.insertBefore(parent.firstChild, parent);
+                            }
+                            grandParent.removeChild(parent);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     applySizeToSelection(fontSize) {
