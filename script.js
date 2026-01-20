@@ -105,9 +105,7 @@ class Notebook {
                 const rightContent = document.getElementById('rightContent');
                 const commonAncestor = range.commonAncestorContainer;
                 if (leftContent.contains(commonAncestor) || rightContent.contains(commonAncestor)) {
-                    if (!selection.isCollapsed) {
-                        this.updateSavedSelection();
-                    }
+                    this.updateSavedSelection();
                 }
             }
         });
@@ -161,15 +159,18 @@ class Notebook {
         
         document.getElementById('boldBtn').addEventListener('mousedown', (e) => {
             e.preventDefault();
-            this.applyStyleToSelection('bold');
+            this.updateSavedSelection();
+            setTimeout(() => this.applyStyleToSelection('bold'), 0);
         });
         document.getElementById('italicBtn').addEventListener('mousedown', (e) => {
             e.preventDefault();
-            this.applyStyleToSelection('italic');
+            this.updateSavedSelection();
+            setTimeout(() => this.applyStyleToSelection('italic'), 0);
         });
         document.getElementById('strikeBtn').addEventListener('mousedown', (e) => {
             e.preventDefault();
-            this.applyStyleToSelection('strikethrough');
+            this.updateSavedSelection();
+            setTimeout(() => this.applyStyleToSelection('strikethrough'), 0);
         });
         
         document.getElementById('shareBtn').addEventListener('click', () => this.exportToExample());
@@ -303,21 +304,20 @@ class Notebook {
 
     saveSelection() {
         const selection = window.getSelection();
-        if (selection.rangeCount === 0 || selection.isCollapsed) {
-            return null;
-        }
+        if (!selection || selection.rangeCount === 0) return null;
         const range = selection.getRangeAt(0);
         const leftContent = document.getElementById('leftContent');
         const rightContent = document.getElementById('rightContent');
         const commonAncestor = range.commonAncestorContainer;
-        if (!leftContent.contains(commonAncestor) && !rightContent.contains(commonAncestor) && commonAncestor !== leftContent && commonAncestor !== rightContent) {
-            return null;
-        }
+        const inLeft = leftContent && (leftContent.contains(commonAncestor) || leftContent === commonAncestor);
+        const inRight = rightContent && (rightContent.contains(commonAncestor) || rightContent === commonAncestor);
+        if (!inLeft && !inRight) return null;
         return {
             startContainer: range.startContainer,
             startOffset: range.startOffset,
             endContainer: range.endContainer,
-            endOffset: range.endOffset
+            endOffset: range.endOffset,
+            collapsed: range.collapsed
         };
     }
     
@@ -564,6 +564,47 @@ class Notebook {
         const root = range.commonAncestorContainer;
         return (root.nodeType === Node.TEXT_NODE) ? root.parentNode : root;
     }
+    getEditableRootFromRange(range) {
+        const leftContent = document.getElementById('leftContent');
+        const rightContent = document.getElementById('rightContent');
+        const commonAncestor = range.commonAncestorContainer;
+        if (leftContent && (leftContent.contains(commonAncestor) || leftContent === commonAncestor)) return leftContent;
+        if (rightContent && (rightContent.contains(commonAncestor) || rightContent === commonAncestor)) return rightContent;
+        return null;
+    }
+    getWordRangeAtCaret() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return null;
+        const baseRange = sel.getRangeAt(0);
+        if (!baseRange.collapsed) return baseRange.cloneRange();
+        let node = baseRange.startContainer;
+        let offset = baseRange.startOffset;
+        if (node.nodeType !== Node.TEXT_NODE) {
+            const child = node.childNodes[offset] || node.childNodes[offset - 1];
+            if (child && child.nodeType === Node.TEXT_NODE) {
+                node = child;
+                offset = Math.min(offset, node.nodeValue.length);
+            } else {
+                return null;
+            }
+        }
+        const text = node.nodeValue || '';
+        if (!text.trim()) return null;
+        const isWordChar = (ch) => /[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ_]/.test(ch);
+        let start = offset;
+        let end = offset;
+        if (start > 0 && !isWordChar(text[start]) && isWordChar(text[start - 1])) {
+            start -= 1;
+            end = start;
+        }
+        while (start > 0 && isWordChar(text[start - 1])) start--;
+        while (end < text.length && isWordChar(text[end])) end++;
+        if (end <= start) return null;
+        const r = document.createRange();
+        r.setStart(node, start);
+        r.setEnd(node, end);
+        return r;
+    }
     hasStyleInRange(range, styleProperty, styleValue) {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return false;
@@ -666,24 +707,48 @@ class Notebook {
     }
     
     applyStyleToSelection(styleType) {
-        const selection = window.getSelection();
-        if (selection.rangeCount === 0 || selection.isCollapsed) {
-            return;
+        let range = null;
+        if (this.savedSelection) {
+            const restored = this.restoreSelection(this.savedSelection);
+            if (restored) range = restored;
         }
-        const range = selection.getRangeAt(0).cloneRange();
+        const selection = window.getSelection();
+        if (!range && selection && selection.rangeCount > 0) {
+            range = selection.getRangeAt(0).cloneRange();
+        }
+        if (!range) return;
+        if (range.collapsed) {
+            const wordRange = this.getWordRangeAtCaret();
+            if (wordRange) {
+                range = wordRange;
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                const span = document.createElement('span');
+                let css = '';
+                if (styleType === 'bold') css = 'font-weight: bold !important;';
+                if (styleType === 'italic') css = 'font-style: italic !important;';
+                if (styleType === 'strikethrough') css = 'text-decoration: line-through !important;';
+                span.style.cssText = css;
+                span.innerHTML = '&#8203;';
+                range.insertNode(span);
+                range.setStart(span.firstChild || span, 1);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                this.savedSelection = null;
+                this.saveAllPages();
+                return;
+            }
+        }
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) {
+            this.savedSelection = null;
             return;
         }
-        const leftContent = document.getElementById('leftContent');
-        const rightContent = document.getElementById('rightContent');
-        let targetElement = null;
-        const commonAncestor = range.commonAncestorContainer;
-        if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
-            targetElement = leftContent;
-        } else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) {
-            targetElement = rightContent;
-        } else {
+        const targetElement = this.getEditableRootFromRange(range);
+        if (!targetElement) {
+            this.savedSelection = null;
             return;
         }
         let styleProperty = '';
@@ -705,11 +770,11 @@ class Notebook {
             } else {
                 this.applyInlineStyleToRange(range, { [styleProperty]: styleValue });
             }
-            setTimeout(() => {
-                targetElement?.focus();
-            }, 0);
+            setTimeout(() => targetElement?.focus(), 0);
         } catch (e) {
             console.error('Style application error:', e);
+        } finally {
+            this.savedSelection = null;
         }
         this.saveAllPages();
     }
@@ -780,82 +845,56 @@ class Notebook {
     applySizeToSelection(fontSize) {
         let range = null;
         let targetElement = null;
-        
         if (this.savedSelection) {
             const restored = this.restoreSelection(this.savedSelection);
-            if (restored) {
-                range = restored;
-                const leftContent = document.getElementById('leftContent');
-                const rightContent = document.getElementById('rightContent');
-                const commonAncestor = range.commonAncestorContainer;
-                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
-                    targetElement = leftContent;
-                } else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) {
-                    targetElement = rightContent;
-                }
-            }
+            if (restored) range = restored;
         }
-        
-        if (!range) {
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) {
-                return;
-            }
-            
-            range = selection.getRangeAt(0).cloneRange();
-            const leftContent = document.getElementById('leftContent');
-            const rightContent = document.getElementById('rightContent');
-            const commonAncestor = range.commonAncestorContainer;
-            
-            if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) {
-                targetElement = leftContent;
-            } else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) {
-                targetElement = rightContent;
-            } else {
-                return;
-            }
-        }
-        
-        if (!targetElement || !range) {
+        const sel = window.getSelection();
+        if (!range && sel && sel.rangeCount > 0) range = sel.getRangeAt(0).cloneRange();
+        if (!range) return;
+        targetElement = this.getEditableRootFromRange(range);
+        if (!targetElement) {
+            this.savedSelection = null;
             return;
         }
-        
-        const selectedText = range.toString();
-        if (!selectedText || !selectedText.trim()) {
-            try {
+        if (range.collapsed) {
+            const wordRange = this.getWordRangeAtCaret();
+            if (wordRange) {
+                range = wordRange;
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
                 const span = document.createElement('span');
                 span.style.cssText = `font-size: ${fontSize} !important;`;
                 span.innerHTML = '&#8203;';
                 range.insertNode(span);
-                range.setStartAfter(span);
+                range.setStart(span.firstChild || span, 1);
                 range.collapse(true);
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(range);
+                sel.removeAllRanges();
+                sel.addRange(range);
                 targetElement.focus();
                 this.savedSelection = null;
                 this.saveAllPages();
-            } catch (e) {
-                console.error('Size application error:', e);
-                this.savedSelection = null;
+                return;
             }
+        }
+        const selectedText = range.toString();
+        if (!selectedText || !selectedText.trim()) {
+            this.savedSelection = null;
             return;
         }
         
         try {
             const contents = range.extractContents();
-            
             const removeSizeStyles = (node) => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     const element = node;
                     element.style.removeProperty('font-size');
-                    
                     if (element.children.length > 0) {
                         Array.from(element.children).forEach(child => {
                             removeSizeStyles(child);
                         });
                     }
-                    
                     if (element.style.length === 0 && element.tagName === 'SPAN' && !element.hasAttribute('style')) {
                         const parent = element.parentNode;
                         if (parent) {
@@ -867,7 +906,6 @@ class Notebook {
                     }
                 }
             };
-            
             if (contents.nodeType === Node.ELEMENT_NODE) {
                 removeSizeStyles(contents);
             } else if (contents.childNodes.length > 0) {
@@ -875,18 +913,14 @@ class Notebook {
                     removeSizeStyles(child);
                 });
             }
-            
             const span = document.createElement('span');
             span.style.cssText = `font-size: ${fontSize} !important;`;
-            
             if (contents.childNodes.length === 0) {
                 span.textContent = selectedText;
             } else {
                 span.appendChild(contents);
             }
-            
             range.insertNode(span);
-            
             setTimeout(() => {
                 const newSelection = window.getSelection();
                 newSelection.removeAllRanges();
@@ -895,13 +929,11 @@ class Notebook {
                 newSelection.addRange(newRange);
                 targetElement.focus();
             }, 0);
-            
             this.savedSelection = null;
         } catch (e) {
             console.error('Size application error:', e);
             this.savedSelection = null;
         }
-        
         this.saveAllPages();
     }
     
@@ -972,54 +1004,52 @@ class Notebook {
     applyFontToSelection(fontFamily) {
         let range = null;
         let targetElement = null;
-        const selection = window.getSelection();
         if (this.savedSelection) {
             const restored = this.restoreSelection(this.savedSelection);
-            if (restored) {
-                range = restored;
-                const leftContent = document.getElementById('leftContent');
-                const rightContent = document.getElementById('rightContent');
-                const commonAncestor = range.commonAncestorContainer;
-                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
-                else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
-            }
+            if (restored) range = restored;
         }
-        if (!range) {
-            if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                range = selection.getRangeAt(0).cloneRange();
-                const leftContent = document.getElementById('leftContent');
-                const rightContent = document.getElementById('rightContent');
-                const commonAncestor = range.commonAncestorContainer;
-                if (leftContent.contains(commonAncestor) || leftContent === commonAncestor) targetElement = leftContent;
-                else if (rightContent.contains(commonAncestor) || rightContent === commonAncestor) targetElement = rightContent;
-                else {
-                    range = null;
-                }
-            }
-        }
-        if (!range || !targetElement) {
+        const sel = window.getSelection();
+        if (!range && sel && sel.rangeCount > 0) range = sel.getRangeAt(0).cloneRange();
+        if (!range) return;
+        targetElement = this.getEditableRootFromRange(range);
+        if (!targetElement) {
             this.savedSelection = null;
-            this.isApplyingFont = false;
             return;
+        }
+        if (range.collapsed) {
+            const wordRange = this.getWordRangeAtCaret();
+            if (wordRange) {
+                range = wordRange;
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                const span = document.createElement('span');
+                span.style.setProperty('font-family', fontFamily, 'important');
+                span.innerHTML = '&#8203;';
+                range.insertNode(span);
+                range.setStart(span.firstChild || span, 1);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                targetElement.focus();
+                this.savedSelection = null;
+                this.saveAllPages();
+                return;
+            }
         }
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) {
             this.savedSelection = null;
-            this.isApplyingFont = false;
             return;
         }
         try {
             this.applyInlineStyleToRange(range, { 'font-family': fontFamily });
-            setTimeout(() => {
-                targetElement?.focus();
-            }, 0);
-            this.savedSelection = null;
-            this.isApplyingFont = false;
+            setTimeout(() => targetElement?.focus(), 0);
             this.saveAllPages();
         } catch (e) {
             console.error('Font application error:', e);
+        } finally {
             this.savedSelection = null;
-            this.isApplyingFont = false;
         }
     }
     
