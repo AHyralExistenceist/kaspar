@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>노트북</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="notebook-container">
+        <div class="notebook">
+            <div class="page left-page" id="leftPage">
+                <div class="page-header">
+                    <div class="header-field">
+                        <span class="label">No.</span>
+                        <span class="value" id="pageNumber">1</span>
+                    </div>
+                    <div class="header-field">
+                        <span class="label">Date</span>
+                        <span class="value" id="currentDate"></span>
+                    </div>
+                </div>
+                <div class="page-content" contenteditable="true" id="leftContent"></div>
+            </div>
+            <div class="spine"></div>
+            <div class="page right-page" id="rightPage">
+                <div class="page-header">
+                    <div class="header-field">
+                        <span class="label">No.</span>
+                        <span class="value" id="pageNumberRight">2</span>
+                    </div>
+                    <div class="header-field">
+                        <span class="label">Date</span>
+                        <span class="value" id="currentDateRight"></span>
+                    </div>
+                </div>
+                <div class="page-content" contenteditable="true" id="rightContent"></div>
+            </div>
+        </div>
+        <div class="controls">
+            <button class="nav-btn" id="prevBtn">이전</button>
+            <span class="page-info" id="pageInfo">페이지 1</span>
+            <button class="nav-btn" id="nextBtn">다음</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+
