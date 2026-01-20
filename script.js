@@ -109,6 +109,8 @@ class Notebook {
             e.preventDefault();
             this.applyStyleToSelection('strikethrough');
         });
+        
+        document.getElementById('shareBtn').addEventListener('click', () => this.exportToExample());
     }
     
     handleInput(e, targetElement) {
@@ -869,6 +871,27 @@ class Notebook {
         }
         
         this.saveCurrentPage();
+    }
+    
+    async exportToExample() {
+        try {
+            const response = await fetch('/api/export-example', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(this.pages)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                alert('example-data.json 파일이 업데이트되었습니다.\n이제 Git에 커밋하고 push하면 다른 사람들도 볼 수 있습니다.');
+            } else {
+                alert('공유하기 실패: 서버에 연결할 수 없습니다.');
+            }
+        } catch (error) {
+            alert('공유하기 실패: ' + error.message);
+        }
     }
 }
 

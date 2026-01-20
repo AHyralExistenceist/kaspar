@@ -9,6 +9,7 @@ app.use(express.static(__dirname));
 app.use(express.json());
 
 const DATA_FILE = path.join(__dirname, 'notebook-data.json');
+const EXAMPLE_FILE = path.join(__dirname, 'example-data.json');
 
 async function ensureDataFile() {
     try {
@@ -45,6 +46,17 @@ app.post('/api/pages', async (req, res) => {
     } catch (error) {
         console.error('Error saving data:', error);
         res.status(500).json({ error: 'Failed to save data' });
+    }
+});
+
+app.post('/api/export-example', async (req, res) => {
+    try {
+        const dataToExport = req.body || {};
+        await fs.writeFile(EXAMPLE_FILE, JSON.stringify(dataToExport, null, 2), 'utf8');
+        res.json({ success: true, message: 'example-data.json 파일이 업데이트되었습니다. Git에 커밋하고 push하세요.' });
+    } catch (error) {
+        console.error('Error exporting example data:', error);
+        res.status(500).json({ error: 'Failed to export example data' });
     }
 });
 
