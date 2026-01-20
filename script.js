@@ -8,7 +8,6 @@ class Notebook {
     init() {
         this.loadPages();
         this.setupEventListeners();
-        this.updateDate();
         this.renderPage();
     }
 
@@ -26,16 +25,6 @@ class Notebook {
         rightContent.addEventListener('blur', () => this.saveCurrentPage());
     }
 
-    updateDate() {
-        const today = new Date();
-        const dateStr = today.toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        });
-        document.getElementById('currentDate').textContent = dateStr;
-        document.getElementById('currentDateRight').textContent = dateStr;
-    }
 
     saveCurrentPage() {
         const leftContent = document.getElementById('leftContent').innerHTML;
@@ -76,19 +65,6 @@ class Notebook {
         document.getElementById('pageNumber').textContent = leftPageNum;
         document.getElementById('pageNumberRight').textContent = rightPageNum;
         document.getElementById('pageInfo').textContent = `페이지 ${this.currentPage}`;
-        
-        if (this.pages[this.currentPage] && this.pages[this.currentPage].date) {
-            const pageDate = new Date(this.pages[this.currentPage].date);
-            const dateStr = pageDate.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            });
-            document.getElementById('currentDate').textContent = dateStr;
-            document.getElementById('currentDateRight').textContent = dateStr;
-        } else {
-            this.updateDate();
-        }
         
         document.getElementById('prevBtn').disabled = this.currentPage === 1;
         document.getElementById('nextBtn').disabled = rightPageNum >= 50;
