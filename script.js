@@ -116,6 +116,9 @@ class Notebook {
         fontSelect.addEventListener('mousedown', (e) => {
             this.savedSelection = this.saveSelection();
         });
+        fontSelect.addEventListener('pointerdown', () => {
+            this.savedSelection = this.saveSelection();
+        });
         fontSelect.addEventListener('focus', () => {
             this.savedSelection = this.saveSelection();
         });
@@ -139,6 +142,9 @@ class Notebook {
         
         const sizeSelect = document.getElementById('sizeSelect');
         sizeSelect.addEventListener('mousedown', (e) => {
+            this.savedSelection = this.saveSelection();
+        });
+        sizeSelect.addEventListener('pointerdown', () => {
             this.savedSelection = this.saveSelection();
         });
         sizeSelect.addEventListener('focus', () => {
@@ -554,12 +560,17 @@ class Notebook {
         }
     }
     
+    getWalkerRoot(range) {
+        const root = range.commonAncestorContainer;
+        return (root.nodeType === Node.TEXT_NODE) ? root.parentNode : root;
+    }
     hasStyleInRange(range, styleProperty, styleValue) {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return false;
         const doc = range.commonAncestorContainer.ownerDocument || document;
+        const walkRoot = this.getWalkerRoot(range);
         const textWalker = doc.createTreeWalker(
-            range.commonAncestorContainer,
+            walkRoot,
             NodeFilter.SHOW_TEXT,
             {
                 acceptNode: (node) => {
@@ -706,8 +717,9 @@ class Notebook {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return;
         const doc = range.commonAncestorContainer.ownerDocument || document;
+        const walkRoot = this.getWalkerRoot(range);
         const textWalker = doc.createTreeWalker(
-            range.commonAncestorContainer,
+            walkRoot,
             NodeFilter.SHOW_TEXT,
             {
                 acceptNode: (node) => {
@@ -897,8 +909,9 @@ class Notebook {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return;
         const doc = range.commonAncestorContainer.ownerDocument || document;
+        const walkRoot = this.getWalkerRoot(range);
         const walker = doc.createTreeWalker(
-            range.commonAncestorContainer,
+            walkRoot,
             NodeFilter.SHOW_TEXT,
             {
                 acceptNode: (node) => {
