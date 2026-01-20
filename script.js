@@ -66,6 +66,13 @@ class Notebook {
         const leftPageNum = (this.currentPage - 1) * 2 + 1;
         const rightPageNum = (this.currentPage - 1) * 2 + 3;
         
+        const leftPage = document.getElementById('leftPage');
+        if (this.currentPage === 1) {
+            leftPage.classList.add('torn');
+        } else {
+            leftPage.classList.remove('torn');
+        }
+        
         document.getElementById('pageNumber').textContent = leftPageNum;
         document.getElementById('pageNumberRight').textContent = rightPageNum;
         document.getElementById('pageInfo').textContent = `페이지 ${this.currentPage}`;
