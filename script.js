@@ -900,61 +900,55 @@ class Notebook {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return;
         const doc = range.commonAncestorContainer.ownerDocument || document;
-        const getTextNodesInRange = (range) => {
-            const textNodes = [];
-            const walker = doc.createTreeWalker(
-                range.commonAncestorContainer,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-            let node;
-            while (node = walker.nextNode()) {
-                if (range.intersectsNode(node) && node.nodeValue && node.nodeValue.trim()) {
-                    textNodes.push(node);
+        const walker = doc.createTreeWalker(
+            range.commonAncestorContainer,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: (node) => {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    try {
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    } catch {
+                        return NodeFilter.FILTER_REJECT;
+                    }
                 }
             }
-            return textNodes;
-        };
-        const textNodes = getTextNodesInRange(range);
+        );
+        const textNodes = [];
+        let node;
+        while ((node = walker.nextNode())) textNodes.push(node);
         if (textNodes.length === 0) return;
+        const findStartOffset = (rng, textNode) => {
+            let lo = 0, hi = textNode.nodeValue.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                const c = rng.comparePoint(textNode, mid);
+                if (c === -1) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo;
+        };
+        const findEndOffset = (rng, textNode) => {
+            let lo = 0, hi = textNode.nodeValue.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                const c = rng.comparePoint(textNode, mid);
+                if (c === 1) hi = mid;
+                else lo = mid + 1;
+            }
+            return lo;
+        };
         for (const textNode of textNodes) {
-            let nodeStartOffset = 0;
-            let nodeEndOffset = textNode.nodeValue.length;
-            if (textNode === range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
-                nodeStartOffset = range.startOffset;
-            } else {
-                const testRange = doc.createRange();
-                testRange.setStart(range.startContainer, range.startOffset);
-                testRange.setEndBefore(textNode);
-                const textBefore = testRange.toString();
-                nodeStartOffset = 0;
-            }
-            if (textNode === range.endContainer && range.endContainer.nodeType === Node.TEXT_NODE) {
-                nodeEndOffset = range.endOffset;
-            } else {
-                const testRange = doc.createRange();
-                testRange.setStart(range.startContainer, range.startOffset);
-                testRange.setEndAfter(textNode);
-                const textToEnd = testRange.toString();
-                const testRangeBefore = doc.createRange();
-                testRangeBefore.setStart(range.startContainer, range.startOffset);
-                testRangeBefore.setEndBefore(textNode);
-                const textBefore = testRangeBefore.toString();
-                const nodeTextLength = textToEnd.length - textBefore.length;
-                nodeEndOffset = Math.min(textNode.nodeValue.length, nodeTextLength);
-            }
-            nodeStartOffset = Math.max(0, Math.min(nodeStartOffset, textNode.nodeValue.length));
-            nodeEndOffset = Math.max(0, Math.min(nodeEndOffset, textNode.nodeValue.length));
-            if (nodeEndOffset <= nodeStartOffset) continue;
+            const len = textNode.nodeValue.length;
+            let start = findStartOffset(range, textNode);
+            let end = findEndOffset(range, textNode);
+            start = Math.max(0, Math.min(start, len));
+            end = Math.max(0, Math.min(end, len));
+            if (end <= start) continue;
             let target = textNode;
-            if (nodeStartOffset > 0) {
-                target = target.splitText(nodeStartOffset);
-            }
-            const remainingLength = nodeEndOffset - nodeStartOffset;
-            if (remainingLength < target.nodeValue.length) {
-                target.splitText(remainingLength);
-            }
+            if (start > 0) target = target.splitText(start);
+            const remain = end - start;
+            if (remain < target.nodeValue.length) target.splitText(remain);
             const parentEl = target.parentElement;
             if (!parentEl) continue;
             const span = doc.createElement('span');
@@ -997,7 +991,7 @@ class Notebook {
             return;
         }
         try {
-            this.applyInlineStyleToRange(range, { 'font-family': `"${fontFamily}"` });
+            this.applyInlineStyleToRange(range, { 'font-family': fontFamily });
             setTimeout(() => {
                 targetElement?.focus();
             }, 0);
