@@ -900,38 +900,63 @@ class Notebook {
         const selectedText = range.toString();
         if (!selectedText || !selectedText.trim()) return;
         const doc = range.commonAncestorContainer.ownerDocument || document;
-        const walker = doc.createTreeWalker(
-            range.commonAncestorContainer,
-            NodeFilter.SHOW_TEXT,
-            {
-                acceptNode: (node) => {
-                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                    try {
-                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-                    } catch {
-                        return NodeFilter.FILTER_REJECT;
-                    }
+        const getTextNodesInRange = (range) => {
+            const textNodes = [];
+            const walker = doc.createTreeWalker(
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            let node;
+            while (node = walker.nextNode()) {
+                if (range.intersectsNode(node) && node.nodeValue && node.nodeValue.trim()) {
+                    textNodes.push(node);
                 }
             }
-        );
-        const textNodes = [];
-        let n;
-        while ((n = walker.nextNode())) textNodes.push(n);
+            return textNodes;
+        };
+        const textNodes = getTextNodesInRange(range);
         if (textNodes.length === 0) return;
         for (const textNode of textNodes) {
-            let startOffset = 0;
-            let endOffset = textNode.nodeValue.length;
-            if (textNode === range.startContainer) startOffset = range.startOffset;
-            if (textNode === range.endContainer) endOffset = range.endOffset;
-            startOffset = Math.max(0, Math.min(startOffset, textNode.nodeValue.length));
-            endOffset = Math.max(0, Math.min(endOffset, textNode.nodeValue.length));
-            if (endOffset <= startOffset) continue;
-            let target = textNode;
-            if (startOffset > 0) target = target.splitText(startOffset);
-            if (endOffset - startOffset < target.nodeValue.length) target.splitText(endOffset - startOffset);
-            const parentEl = target.parentElement;
-            if (parentEl && parentEl.tagName === 'SPAN') {
+            let nodeStartOffset = 0;
+            let nodeEndOffset = textNode.nodeValue.length;
+            if (textNode === range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+                nodeStartOffset = range.startOffset;
+            } else {
+                const testRange = doc.createRange();
+                testRange.setStart(range.startContainer, range.startOffset);
+                testRange.setEndBefore(textNode);
+                const textBefore = testRange.toString();
+                nodeStartOffset = 0;
             }
+            if (textNode === range.endContainer && range.endContainer.nodeType === Node.TEXT_NODE) {
+                nodeEndOffset = range.endOffset;
+            } else {
+                const testRange = doc.createRange();
+                testRange.setStart(range.startContainer, range.startOffset);
+                testRange.setEndAfter(textNode);
+                const textToEnd = testRange.toString();
+                const testRangeBefore = doc.createRange();
+                testRangeBefore.setStart(range.startContainer, range.startOffset);
+                testRangeBefore.setEndBefore(textNode);
+                const textBefore = testRangeBefore.toString();
+                const nodeTextLength = textToEnd.length - textBefore.length;
+                nodeEndOffset = Math.min(textNode.nodeValue.length, nodeTextLength);
+            }
+            nodeStartOffset = Math.max(0, Math.min(nodeStartOffset, textNode.nodeValue.length));
+            nodeEndOffset = Math.max(0, Math.min(nodeEndOffset, textNode.nodeValue.length));
+            if (nodeEndOffset <= nodeStartOffset) continue;
+            let target = textNode;
+            if (nodeStartOffset > 0) {
+                target = target.splitText(nodeStartOffset);
+            }
+            const remainingLength = nodeEndOffset - nodeStartOffset;
+            if (remainingLength < target.nodeValue.length) {
+                target.splitText(remainingLength);
+            }
+            const parentEl = target.parentElement;
+            if (!parentEl) continue;
             const span = doc.createElement('span');
             for (const [k, v] of Object.entries(styleObj)) {
                 span.style.setProperty(k, v, 'important');
