@@ -346,13 +346,21 @@ class Notebook {
             img.src = e.target.result;
             img.style.maxWidth = '100%';
             img.style.height = 'auto';
+            img.style.display = 'block';
+            img.style.margin = '10px 0';
+            img.setAttribute('data-image', 'true');
             range.insertNode(img);
             const newRange = document.createRange();
             newRange.setStartAfter(img);
             newRange.collapse(true);
             selection.removeAllRanges();
             selection.addRange(newRange);
-            this.saveAllPages();
+            setTimeout(() => {
+                this.saveAllPages();
+            }, 100);
+        };
+        reader.onerror = (e) => {
+            console.error('Image read error:', e);
         };
         reader.readAsDataURL(file);
     }
