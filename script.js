@@ -90,6 +90,17 @@ class Notebook {
         leftContent.addEventListener('cut', (e) => this.handleCopy(e));
         rightContent.addEventListener('cut', (e) => this.handleCopy(e));
         
+        leftContent.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        leftContent.addEventListener('drop', (e) => this.handleDrop(e, leftContent));
+        rightContent.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        rightContent.addEventListener('drop', (e) => this.handleDrop(e, rightContent));
+        
         leftContent.addEventListener('mouseup', () => {
             setTimeout(() => this.updateSavedSelection(), 0);
         });
@@ -277,29 +288,73 @@ class Notebook {
     handlePaste(e) {
         e.preventDefault();
         const selection = window.getSelection();
-        
-        if (selection.rangeCount === 0) {
-            return;
+        if (selection.rangeCount === 0) return;
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const items = clipboardData.items;
+        let imageFound = false;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                this.insertImage(blob, selection);
+                imageFound = true;
+                break;
+            }
         }
-        
-        const pasteData = (e.clipboardData || window.clipboardData).getData('text/plain');
-        
-        if (!pasteData) {
-            return;
-        }
-        
+        if (imageFound) return;
+        const pasteData = clipboardData.getData('text/plain');
+        if (!pasteData) return;
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        
         const textNode = document.createTextNode(pasteData);
         range.insertNode(textNode);
-        
         range.setStartAfter(textNode);
         range.collapse(true);
         selection.removeAllRanges();
         selection.addRange(range);
-        
         this.saveAllPages();
+    }
+    handleDrop(e, targetElement) {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = e.dataTransfer.files;
+        if (files.length === 0) return;
+        const selection = window.getSelection();
+        let range = null;
+        if (selection.rangeCount > 0) {
+            range = selection.getRangeAt(0);
+        } else {
+            range = document.createRange();
+            range.selectNodeContents(targetElement);
+            range.collapse(false);
+        }
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.type.indexOf('image') !== -1) {
+                this.insertImage(file, selection, range);
+            }
+        }
+    }
+    insertImage(file, selection, range = null) {
+        if (!range && selection.rangeCount > 0) {
+            range = selection.getRangeAt(0);
+        }
+        if (!range) return;
+        range.deleteContents();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            range.insertNode(img);
+            const newRange = document.createRange();
+            newRange.setStartAfter(img);
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+            this.saveAllPages();
+        };
+        reader.readAsDataURL(file);
     }
 
     saveSelection() {

@@ -6,7 +6,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.static(__dirname));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 const DATA_FILE = path.join(__dirname, 'notebook-data.json');
 const EXAMPLE_FILE = path.join(__dirname, 'example-data.json');
